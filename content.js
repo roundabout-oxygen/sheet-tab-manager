@@ -491,18 +491,16 @@
   });
   const chipsEl = h('div', { class: 'stm-chips', role: 'group', 'aria-label': '色で絞り込み' });
   const allCb = h('input', { type: 'checkbox', id: 'stm-all' });
-  const selEl = h('span', { class: 'stm-sel', 'aria-live': 'polite' });
-  const bulkBtn = (key, label, cls = '') => h('button', { class: 'stm-btn ' + cls, 'data-act': key }, label);
+  const clearSelBtn = h('button', { class: 'stm-btn', 'data-act': 'clearsel', title: '選択を解除 (Esc)' }, '選択解除');
+  const menuBtn = h('button', { class: 'stm-btn', 'data-act': 'bulkmenu', 'aria-haspopup': 'menu', title: '選択したシートへの操作' }, '操作 ▾');
+  const showHidCb = h('input', { type: 'checkbox', 'aria-label': '非表示シートも表示する' });
   const bulkEl = h(
     'div',
     { class: 'stm-bulk' },
     h('label', {}, allCb, '全選択'),
-    selEl,
-    bulkBtn('copy', 'コピー'),
-    bulkBtn('show', '表示'),
-    bulkBtn('hide', '非表示'),
-    bulkBtn('color', '色'),
-    bulkBtn('delete', '削除', 'stm-danger')
+    clearSelBtn,
+    menuBtn,
+    h('label', { class: 'stm-showhid', title: '非表示シートも一覧に表示' }, showHidCb, h('span', { html: ICON.eyeOff }))
   );
   const authEl = h('div', { class: 'stm-auth', hidden: true });
   const listEl = h('div', { class: 'stm-list', role: 'list', 'aria-label': 'シート' });
@@ -611,6 +609,7 @@
     const q = S.query.trim().toLowerCase();
     return S.sheets.filter(
       (s) =>
+        (S.ui.showHidden || !s.hidden || S.temp.has(s.id)) &&
         (!q || s.title.toLowerCase().includes(q)) &&
         (S.colorFilter.size === 0 || S.colorFilter.has(s.color || 'none'))
     );
@@ -691,8 +690,10 @@
     const selVis = vis.filter((s) => S.selected.has(s.id)).length;
     allCb.checked = vis.length > 0 && selVis === vis.length;
     allCb.indeterminate = selVis > 0 && selVis < vis.length;
-    selEl.textContent = S.selected.size ? `${S.selected.size}件選択` : '';
-    for (const b of bulkEl.querySelectorAll('button')) b.disabled = S.selected.size === 0 || S.busy > 0;
+    clearSelBtn.textContent = S.selected.size ? `選択解除 (${S.selected.size})` : '選択解除';
+    clearSelBtn.disabled = S.selected.size === 0;
+    menuBtn.disabled = S.selected.size === 0 || S.busy > 0;
+    showHidCb.checked = !!S.ui.showHidden;
   }
 
   let listKey = '';
@@ -1442,23 +1443,40 @@
         S.code = err.code;
         render();
       }
-    } else if (act === 'copy') {
+    } else if (act === 'clearsel') {
       S.selected.clear();
-      copySheets(ids);
-    } else if (act === 'delete') deleteSheets(ids);
-    else if (act === 'show') setHidden(ids, false);
-    else if (act === 'hide') setHidden(ids, true);
-    else if (act === 'color') {
+      render();
+    } else if (act === 'bulkmenu') {
+      if (!menuEl.hidden) return closePopups();
+      if (!ids.length) return;
       const r = b.getBoundingClientRect();
-      openColorPop(r.left, r.bottom + 4, ids);
+      const item = (label, fn, cls = '') =>
+        h('button', { class: cls, role: 'menuitem', onclick: () => { closePopups(); fn(); } }, label);
+      menuEl.replaceChildren(
+        item('コピー', () => { S.selected.clear(); copySheets(ids); }),
+        item('表示にする', () => setHidden(ids, false)),
+        item('非表示にする', () => setHidden(ids, true)),
+        item('色を変更…', () => openColorPop(r.left, r.bottom + 4, ids)),
+        h('hr'),
+        item('削除', () => deleteSheets(ids), 'stm-danger')
+      );
+      placeAt(menuEl, r.left, r.bottom + 4);
+      menuEl.querySelector('button')?.focus({ preventScroll: true });
     }
+  });
+
+  showHidCb.addEventListener('change', () => {
+    S.ui.showHidden = showHidCb.checked;
+    saveUi();
+    pruneSelectionToVisible();
+    render();
   });
 
   // ポップアップの外側クリックで閉じる
   window.addEventListener(
     'mousedown',
     (e) => {
-      if (!root.contains(e.target) || (!e.target.closest('.stm-menu') && !e.target.closest('.stm-pop') && !e.target.closest('[data-act="color"]')))
+      if (!root.contains(e.target) || (!e.target.closest('.stm-menu') && !e.target.closest('.stm-pop') && !e.target.closest('[data-act="bulkmenu"]')))
         closePopups();
     },
     true

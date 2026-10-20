@@ -247,9 +247,17 @@
   cursor: pointer;
   white-space: nowrap;
 }
-#stm-root .stm-bulk .stm-sel {
+#stm-root .stm-bulk label.stm-showhid {
+  margin-right: 0;
+  gap: 2px;
   color: var(--sub);
-  font-size: 12px;
+}
+#stm-root .stm-bulk label.stm-showhid:has(input:checked) {
+  color: var(--accent);
+}
+#stm-root .stm-bulk label.stm-showhid svg {
+  width: 18px;
+  height: 18px;
 }
 #stm-root .stm-btn {
   height: 26px;
