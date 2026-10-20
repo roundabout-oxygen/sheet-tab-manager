@@ -491,14 +491,12 @@
   });
   const chipsEl = h('div', { class: 'stm-chips', role: 'group', 'aria-label': '色で絞り込み' });
   const allCb = h('input', { type: 'checkbox', id: 'stm-all' });
-  const clearSelBtn = h('button', { class: 'stm-btn', 'data-act': 'clearsel', title: '選択を解除 (Esc)' }, '選択解除');
   const menuBtn = h('button', { class: 'stm-btn', 'data-act': 'bulkmenu', 'aria-haspopup': 'menu', title: '選択したシートへの操作' }, '操作 ▾');
   const showHidCb = h('input', { type: 'checkbox', 'aria-label': '非表示シートも表示する' });
   const bulkEl = h(
     'div',
     { class: 'stm-bulk' },
     h('label', {}, allCb, '全選択'),
-    clearSelBtn,
     menuBtn,
     h('label', { class: 'stm-showhid', title: '非表示シートも一覧に表示' }, showHidCb, h('span', { html: ICON.eyeOff }))
   );
@@ -658,12 +656,13 @@
       stats.set(k, (stats.get(k) || 0) + 1);
     }
     const hasColor = [...stats.keys()].some((k) => k !== 'none');
-    const key = JSON.stringify([...stats, ...S.colorFilter]);
+    const nSel = S.selected.size;
+    const key = JSON.stringify([...stats, ...S.colorFilter, nSel]);
     if (key === chipsKey) return;
     chipsKey = key;
     chipsEl.replaceChildren();
-    chipsEl.style.display = hasColor ? '' : 'none';
-    if (!hasColor) return;
+    chipsEl.style.display = hasColor || nSel ? '' : 'none';
+    if (!hasColor && !nSel) return;
     const keys = [...stats.keys()].sort((a, b) => (a === 'none') - (b === 'none') || a.localeCompare(b));
     for (const k of keys) {
       const label = `${k === 'none' ? '色なし' : k}  ${stats.get(k)}枚`;
@@ -682,7 +681,12 @@
         )
       );
     }
-    if (S.colorFilter.size) chipsEl.append(h('button', { class: 'stm-clear', 'data-act': 'clearfilter' }, '解除'));
+    // 色の絞り込みと選択をまとめて解除する
+    if (S.colorFilter.size || nSel) {
+      chipsEl.append(
+        h('button', { class: 'stm-clear', 'data-act': 'clearfilter', title: '色の絞り込みと選択を解除 (Esc)' }, nSel ? `解除 (${nSel})` : '解除')
+      );
+    }
   }
 
   function renderBulk() {
@@ -690,8 +694,6 @@
     const selVis = vis.filter((s) => S.selected.has(s.id)).length;
     allCb.checked = vis.length > 0 && selVis === vis.length;
     allCb.indeterminate = selVis > 0 && selVis < vis.length;
-    clearSelBtn.textContent = S.selected.size ? `選択解除 (${S.selected.size})` : '選択解除';
-    clearSelBtn.disabled = S.selected.size === 0;
     menuBtn.disabled = S.selected.size === 0 || S.busy > 0;
     showHidCb.checked = !!S.ui.showHidden;
   }
@@ -891,6 +893,12 @@
       // 一時表示中のシートは「実質非表示」として数える(後で戻すと表示シートが無くなるため)
       const remain = S.sheets.filter((s) => !ids.includes(s.id) && !isLogicallyHidden(s)).length;
       if (remain < 1) return toast('少なくとも1枚のシートは表示にしておく必要があります', 'err');
+      // 非表示にしたシートが一覧から消えないよう、非表示シートの表示をオンにする
+      if (!S.ui.showHidden) {
+        S.ui.showHidden = true;
+        saveUi();
+        render();
+      }
     }
     if (await mutate(ids.map((id) => propReq(id, { hidden: hide }, 'hidden')), { untrack: ids })) release(ids);
   }
@@ -1416,6 +1424,7 @@
       render();
     } else if (e.target.closest('[data-act="clearfilter"]')) {
       S.colorFilter.clear();
+      S.selected.clear();
       render();
     }
   });
@@ -1443,9 +1452,6 @@
         S.code = err.code;
         render();
       }
-    } else if (act === 'clearsel') {
-      S.selected.clear();
-      render();
     } else if (act === 'bulkmenu') {
       if (!menuEl.hidden) return closePopups();
       if (!ids.length) return;
@@ -1582,7 +1588,7 @@
       searchEl.focus();
     } else if (e.key === 'Escape') {
       if (!menuEl.hidden || !popEl.hidden) closePopups();
-      else if (S.selected.size) { S.selected.clear(); render(); }
+      else if (S.selected.size || S.colorFilter.size) { S.selected.clear(); S.colorFilter.clear(); render(); }
     }
   }
 
