@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Sheet Tab Manager",
+  "version": "1.1.0",
+  "minimum_chrome_version": "116",
+  "description": "Googleスプレッドシートのタブ色を全面塗りにし、縦型シート一覧(並び替え・表示/非表示・コピー・削除・色変更)を提供します。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwDFIbwIKB2PkhZ2JLomIHxgOnV49mkEprvMneA331egRQMwfRF53MRrhszr5W3yalUDFgbVW2CQ+Bs13bSeQ0W6ro/DuixZ/nscCnTIaMBC/kYlop30t/pyfViIk9w8+MSHGO6g2UdhBj26e1LpTYM2y7lb8jfKtGnBjhTOd1bzT59LXcaXtEJCZpIMVQsxxXZRl8UyuJrFRMQvJwByh9ikesQO5pwU2tUXBQYFlBlN1p13/I5Hm7W1H2sRdjg3JKUUbj2WqbfnSB2oXIA+hgvEL6lAmyd/FsTviaLkMVyZxKDDKOK+84f2Z9YLFX5IrfkfaUqthikeXRooLR/6bLQIDAQAB",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "permissions": ["identity", "storage"],
+  "host_permissions": ["https://sheets.googleapis.com/*"],
+  "oauth2": {
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/spreadsheets"]
+  },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/spreadsheets/d/*", "https://docs.google.com/spreadsheets/u/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": { "default_title": "シート一覧を開閉" },
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": { "default": "Alt+Shift+W" },
+      "description": "シート一覧ウィンドウを開閉"
+    },
+    "focus-search": {
+      "suggested_key": { "default": "Alt+Shift+K" },
+      "description": "シート一覧を開いて検索欄へ移動"
+    }
+  }
+}
